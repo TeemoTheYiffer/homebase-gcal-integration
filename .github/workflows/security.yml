@@ -31,4 +31,6 @@ jobs:
           cache: pip
       - run: pip install -e .
       - run: pip install pip-audit
-      - run: pip-audit --strict
+      # --skip-editable ignores our own package (not on PyPI). Can't combine
+      # with --strict, which would treat the skip itself as a failure.
+      - run: pip-audit --skip-editable
