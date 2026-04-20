@@ -30,6 +30,15 @@ resource "google_project_iam_member" "deployer_run_admin" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# Read access to IAM, WIF, Scheduler, etc. so `terraform apply` can build a
+# diff for resources it doesn't actively modify. Writes are still gated by
+# the narrower roles above.
+resource "google_project_iam_member" "deployer_viewer" {
+  project = var.project_id
+  role    = "roles/viewer"
+  member  = "serviceAccount:${google_service_account.deployer.email}"
+}
+
 # Required so deployer can attach the runner SA to the Job revision.
 resource "google_service_account_iam_member" "deployer_act_as_runner" {
   service_account_id = google_service_account.runner.name
