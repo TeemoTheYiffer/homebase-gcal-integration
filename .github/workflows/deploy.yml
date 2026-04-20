@@ -1,0 +1,86 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  PROJECT_ID: homebase-gcal-sync
+  REGION: us-west1
+  REPO: containers
+  JOB_NAME: homebase-sync
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push container
+        env:
+          IMAGE: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.JOB_NAME }}:${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform apply (infra shape only)
+        working-directory: infra
+        env:
+          TF_VAR_image_tag: ${{ github.sha }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Write env vars to YAML
+        env:
+          HOMEBASE_EMAIL:        ${{ secrets.HOMEBASE_EMAIL }}
+          HOMEBASE_PASSWORD:     ${{ secrets.HOMEBASE_PASSWORD }}
+          GCAL_CREDENTIALS_JSON: ${{ secrets.GCAL_CREDENTIALS_JSON }}
+          GCAL_TOKEN_JSON:       ${{ secrets.GCAL_TOKEN_JSON }}
+          EMPLOYEES_CONFIG_TOML: ${{ secrets.EMPLOYEES_CONFIG_TOML }}
+        run: |
+          python3 - <<'PY' > env.yaml
+          import os, yaml
+          data = {
+              "HOMEBASE_EMAIL":        os.environ["HOMEBASE_EMAIL"],
+              "HOMEBASE_PASSWORD":     os.environ["HOMEBASE_PASSWORD"],
+              "GCAL_CREDENTIALS_JSON": os.environ["GCAL_CREDENTIALS_JSON"],
+              "GCAL_TOKEN_JSON":       os.environ["GCAL_TOKEN_JSON"],
+              "EMPLOYEES_CONFIG_TOML": os.environ["EMPLOYEES_CONFIG_TOML"],
+              "SYNC_TIMEZONE": "America/Los_Angeles",
+              "LOG_LEVEL": "INFO",
+          }
+          print(yaml.safe_dump(data, default_flow_style=False))
+          PY
+
+      - name: Update Cloud Run Job env vars
+        run: |
+          gcloud run jobs update "${{ env.JOB_NAME }}" \
+            --region="${{ env.REGION }}" \
+            --image="$IMAGE" \
+            --env-vars-file=env.yaml
+
+      - name: Cleanup secrets file
+        if: always()
+        run: rm -f env.yaml

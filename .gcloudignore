@@ -1,0 +1,41 @@
+# Files NOT to upload to Cloud Build.
+# Explicit so gcloud doesn't auto-derive from .gitignore (which has quirks).
+
+# Version control / tooling
+.git/
+.gitignore
+.gcloudignore
+
+# Python virtualenvs and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local secrets and dev-only config
+.env
+.env.example
+.secrets/
+src/app_secrets/
+
+# Things the runtime container doesn't need
+infra/
+tests/
+scripts/_dumps/
+playwright-report/
+test-results/
+HANDOFF.md
+# Note: README.md is required by pyproject.toml's `readme` field during pip install.
+
+# IDE / editor
+.vscode/
+.code-workspace
+.idea/
+*.code-workspace

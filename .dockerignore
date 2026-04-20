@@ -1,0 +1,30 @@
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets and local-only files
+.env
+.env.example
+.secrets/
+employees.toml
+src/app_secrets/
+
+# Tests + dev scripts don't ship in the runtime image
+tests/
+scripts/
+
+# Misc
+HANDOFF.md
+infra/
+playwright-report/
+test-results/
+# Note: README.md is required by pyproject.toml's `readme` field during pip install.
