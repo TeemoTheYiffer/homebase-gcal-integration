@@ -84,9 +84,7 @@ def test_sync_window_single_week() -> None:
 
 
 def test_sync_window_dedupes_and_sorts() -> None:
-    start, end = sync_window(
-        [date(2026, 4, 20), date(2026, 4, 13), date(2026, 4, 13)], LA
-    )
+    start, end = sync_window([date(2026, 4, 20), date(2026, 4, 13), date(2026, 4, 13)], LA)
     assert start == datetime(2026, 4, 13, 0, 0, tzinfo=LA)
     assert end == datetime(2026, 4, 27, 0, 0, tzinfo=LA)
 

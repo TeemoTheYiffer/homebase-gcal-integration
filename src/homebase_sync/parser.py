@@ -87,7 +87,7 @@ def _shifts_from_row(row: Tag, week_start: date, tz: ZoneInfo) -> list[Shift]:
 
 
 def _parse_shift_tile(tile: Tag, testid: str, shift_date: date, tz: ZoneInfo) -> Shift:
-    shift_id = testid[len(_SHIFT_TESTID_PREFIX):]
+    shift_id = testid[len(_SHIFT_TESTID_PREFIX) :]
     paragraphs = tile.find_all("p")
     if len(paragraphs) < 2:
         raise ParseError(f"shift tile {testid} has fewer than 2 <p> children")

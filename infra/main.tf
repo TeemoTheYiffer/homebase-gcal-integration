@@ -20,8 +20,8 @@ provider "google" {
 }
 
 locals {
-  job_name           = "homebase-sync"
-  artifact_repo      = "containers"
-  artifact_repo_url  = "${var.region}-docker.pkg.dev/${var.project_id}/${local.artifact_repo}"
-  default_image      = "${local.artifact_repo_url}/${local.job_name}:${var.image_tag}"
+  job_name          = "homebase-sync"
+  artifact_repo     = "containers"
+  artifact_repo_url = "${var.region}-docker.pkg.dev/${var.project_id}/${local.artifact_repo}"
+  default_image     = "${local.artifact_repo_url}/${local.job_name}:${var.image_tag}"
 }

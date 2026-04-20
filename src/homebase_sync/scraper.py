@@ -11,7 +11,8 @@ import logging
 from collections.abc import Iterable
 from datetime import date, timedelta
 
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sync_playwright
+from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
 logger = logging.getLogger("homebase_sync.scraper")

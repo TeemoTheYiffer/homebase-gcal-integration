@@ -61,7 +61,8 @@ def parse_time_token(token: str) -> time:
         raise TimeParseError(f"hour/minute out of range in {token!r}")
 
     # 12am = 00:xx, 12pm = 12:xx, otherwise add 12 for pm.
-    if hour == 12:
+    # The auto-suggested ternary collapse is unreadable; keeping the if/else.
+    if hour == 12:  # noqa: SIM108
         hour_24 = 12 if is_pm else 0
     else:
         hour_24 = hour + 12 if is_pm else hour

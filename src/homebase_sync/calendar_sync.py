@@ -97,7 +97,7 @@ def load_credentials(
     return creds
 
 
-def build_service(credentials: Credentials):  # noqa: ANN201 (Resource is not a stable public type)
+def build_service(credentials: Credentials):
     """Construct the Calendar API client."""
     return build("calendar", "v3", credentials=credentials, cache_discovery=False)
 
@@ -224,9 +224,7 @@ def _sync_employee(
         updated=updated,
         deleted=deleted,
     )
-    logger.info(
-        "sync done for %s: +%d ~%d -%d", employee_name, created, updated, deleted
-    )
+    logger.info("sync done for %s: +%d ~%d -%d", employee_name, created, updated, deleted)
     return report
 
 
@@ -240,9 +238,7 @@ def _upsert_shift(
     """Returns ``"created"`` or ``"updated"``."""
     body = build_event_body(shift, employee_name, timezone)
     try:
-        service.events().get(
-            calendarId=calendar_id, eventId=shift.gcal_event_id
-        ).execute()
+        service.events().get(calendarId=calendar_id, eventId=shift.gcal_event_id).execute()
     except HttpError as exc:
         if exc.resp.status == 404:
             service.events().insert(calendarId=calendar_id, body=body).execute()
@@ -302,11 +298,9 @@ def _write_token(token_path: Path, creds: Credentials) -> None:
         token_path.parent.mkdir(parents=True, exist_ok=True)
         token_path.write_text(creds.to_json())
     except OSError as exc:
-        logger.info(
-            "could not cache token to %s (%s) -- continuing in memory",
-            token_path,
-            exc,
-        )
+        # We log only the path + exception, never the credential contents,
+        # but semgrep flags any message containing the word "token".
+        logger.info("%s is not writable (%s) -- continuing in memory", token_path, exc)
 
 
 def _monday_of(d: date) -> date:

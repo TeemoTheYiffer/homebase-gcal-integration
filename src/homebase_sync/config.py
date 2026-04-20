@@ -72,7 +72,9 @@ def load_config() -> AppConfig:
 
     employees_inline = os.environ.get("EMPLOYEES_CONFIG_TOML")
     if employees_inline:
-        employees = _parse_employees(tomllib.loads(employees_inline), source="EMPLOYEES_CONFIG_TOML")
+        employees = _parse_employees(
+            tomllib.loads(employees_inline), source="EMPLOYEES_CONFIG_TOML"
+        )
     else:
         employees = _load_employees(employees_path)
     if not employees:

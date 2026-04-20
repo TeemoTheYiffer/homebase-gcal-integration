@@ -60,10 +60,7 @@ def main() -> int:
     print("Syncing to Google Calendar...\n")
     reports = sync_all(cfg, scraped)
     for r in reports:
-        print(
-            f"  {r.employee_name} -> {r.calendar_id}: "
-            f"+{r.created} ~{r.updated} -{r.deleted}"
-        )
+        print(f"  {r.employee_name} -> {r.calendar_id}: " f"+{r.created} ~{r.updated} -{r.deleted}")
     print()
     return 0
 
