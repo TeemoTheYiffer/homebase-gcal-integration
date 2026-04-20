@@ -36,3 +36,13 @@ resource "google_service_account_iam_member" "deployer_act_as_runner" {
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
+
+# Deployer needs to read/write Terraform state in the GCS backend bucket.
+# The bucket itself is created out-of-band (chicken-and-egg with the backend).
+# Note: this binding must also exist before the FIRST CI run; granted via
+# `gcloud storage buckets add-iam-policy-binding` during bootstrap.
+resource "google_storage_bucket_iam_member" "deployer_tfstate" {
+  bucket = "homebase-gcal-sync-tfstate"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.deployer.email}"
+}
