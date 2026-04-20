@@ -30,14 +30,13 @@ resource "google_project_iam_member" "deployer_run_admin" {
   member  = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# Read access to IAM, WIF, Scheduler, etc. so `terraform apply` can build a
-# diff for resources it doesn't actively modify. Writes are still gated by
-# the narrower roles above.
-resource "google_project_iam_member" "deployer_viewer" {
-  project = var.project_id
-  role    = "roles/viewer"
-  member  = "serviceAccount:${google_service_account.deployer.email}"
-}
+# NOTE: roles/viewer is also granted to the deployer for read access during
+# `terraform plan`. Managed out-of-band via:
+#   gcloud projects add-iam-policy-binding homebase-gcal-sync \
+#     --member="serviceAccount:github-deployer@homebase-gcal-sync.iam.gserviceaccount.com" \
+#     --role="roles/viewer"
+# Not declared here because TF would need roles/resourcemanager.projectIamAdmin
+# to manage it, which broadens the deployer's blast radius too much.
 
 # Required so deployer can attach the runner SA to the Job revision.
 resource "google_service_account_iam_member" "deployer_act_as_runner" {
@@ -46,12 +45,10 @@ resource "google_service_account_iam_member" "deployer_act_as_runner" {
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
 
-# Deployer needs to read/write Terraform state in the GCS backend bucket.
-# The bucket itself is created out-of-band (chicken-and-egg with the backend).
-# Note: this binding must also exist before the FIRST CI run; granted via
-# `gcloud storage buckets add-iam-policy-binding` during bootstrap.
-resource "google_storage_bucket_iam_member" "deployer_tfstate" {
-  bucket = "homebase-gcal-sync-tfstate"
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.deployer.email}"
-}
+# NOTE: roles/storage.objectAdmin on the TF state bucket is also granted to
+# the deployer. Managed out-of-band via:
+#   gcloud storage buckets add-iam-policy-binding gs://homebase-gcal-sync-tfstate \
+#     --member="serviceAccount:github-deployer@homebase-gcal-sync.iam.gserviceaccount.com" \
+#     --role="roles/storage.objectAdmin"
+# Not declared here because TF would need roles/storage.admin on the bucket
+# to read/manage its IAM policy, beyond what the deployer otherwise needs.
