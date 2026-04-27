@@ -34,4 +34,6 @@ jobs:
       - run: python -m pip install --upgrade "pip>=26.1"
       - run: pip install -e .
       - run: pip install pip-audit
+      # --skip-editable ignores our own package (not on PyPI). Can't combine
+      # with --strict, which would treat the skip itself as a failure.
       - run: pip-audit --skip-editable
