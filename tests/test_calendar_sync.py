@@ -5,7 +5,6 @@ sync_all) are not exercised here -- they require either a real network round-tri
 or non-trivial mocking of googleapiclient. The smoke runner covers them end-to-end.
 """
 
-import json
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13,7 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from homebase_sync.calendar_sync import build_event_body, sync_window
-from homebase_sync.config import ConfigError, load_config
+from homebase_sync.config import load_config
 from homebase_sync.models import Shift
 
 LA = ZoneInfo("America/Los_Angeles")
@@ -94,7 +93,7 @@ def test_sync_window_empty_raises() -> None:
         sync_window([], LA)
 
 
-# --- config: env-var content overrides ---
+# --- config: inline employees TOML ---
 
 
 @pytest.fixture
@@ -105,10 +104,6 @@ def _isolated_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "HOMEBASE_PASSWORD",
         "EMPLOYEES_CONFIG_PATH",
         "EMPLOYEES_CONFIG_TOML",
-        "GCAL_CREDENTIALS_PATH",
-        "GCAL_TOKEN_PATH",
-        "GCAL_CREDENTIALS_JSON",
-        "GCAL_TOKEN_JSON",
         "SYNC_TIMEZONE",
         "LOG_LEVEL",
     ):
@@ -128,33 +123,3 @@ def test_load_config_inline_employees_toml(
     cfg = load_config()
     assert cfg.employees[0].name == "Alice"
     assert cfg.calendar_for("Alice") == "a@group.calendar.google.com"
-
-
-def test_load_config_inline_credentials_and_token_dicts(
-    monkeypatch: pytest.MonkeyPatch, _isolated_env: None
-) -> None:
-    monkeypatch.setenv("HOMEBASE_EMAIL", "x@y.com")
-    monkeypatch.setenv("HOMEBASE_PASSWORD", "pw")
-    monkeypatch.setenv(
-        "EMPLOYEES_CONFIG_TOML",
-        '[[employees]]\nname = "Alice"\ncalendar_id = "a@group.calendar.google.com"\n',
-    )
-    monkeypatch.setenv("GCAL_CREDENTIALS_JSON", json.dumps({"installed": {"client_id": "abc"}}))
-    monkeypatch.setenv("GCAL_TOKEN_JSON", json.dumps({"refresh_token": "xyz"}))
-    cfg = load_config()
-    assert cfg.gcal_credentials_data == {"installed": {"client_id": "abc"}}
-    assert cfg.gcal_token_data == {"refresh_token": "xyz"}
-
-
-def test_load_config_invalid_json_env_raises(
-    monkeypatch: pytest.MonkeyPatch, _isolated_env: None
-) -> None:
-    monkeypatch.setenv("HOMEBASE_EMAIL", "x@y.com")
-    monkeypatch.setenv("HOMEBASE_PASSWORD", "pw")
-    monkeypatch.setenv(
-        "EMPLOYEES_CONFIG_TOML",
-        '[[employees]]\nname = "Alice"\ncalendar_id = "a@group.calendar.google.com"\n',
-    )
-    monkeypatch.setenv("GCAL_CREDENTIALS_JSON", "not-json{")
-    with pytest.raises(ConfigError, match="GCAL_CREDENTIALS_JSON is not valid JSON"):
-        load_config()

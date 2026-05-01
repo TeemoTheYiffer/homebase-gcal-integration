@@ -5,6 +5,12 @@ The strategy is idempotent:
   * For each scraped shift we ``get`` -- if 404, ``insert``; else ``update``.
   * After upserts, list events in the sync window with our prefix and delete
     any whose IDs aren't in the just-scraped set. That handles shift removals.
+
+Auth uses Application Default Credentials. In Cloud Run that's the runtime
+service account (``homebase-sync-runner@...``) injected via the metadata
+server. Locally that's whatever ``gcloud auth application-default login``
+set up. Each target calendar must be shared with the principal (SA email or
+your user email) with at least "Make changes to events" rights.
 """
 
 from __future__ import annotations
@@ -14,12 +20,10 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+import google.auth
+from google.auth.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -46,54 +50,19 @@ class SyncReport:
         return self.created + self.updated + self.deleted
 
 
-def load_credentials(
-    credentials_path: Path,
-    token_path: Path,
-    *,
-    credentials_data: dict | None = None,
-    token_data: dict | None = None,
-) -> Credentials:
-    """Load cached token, refresh if expired, or run interactive OAuth on first run.
+def load_credentials() -> Credentials:
+    """Get credentials from Application Default Credentials.
 
-    Args:
-        credentials_path: Disk path to OAuth client secrets (downloaded from GCP).
-        token_path: Disk path where the user token is cached.
-        credentials_data: In-memory client secrets dict (production: GCAL_CREDENTIALS_JSON).
-            When provided, takes precedence over ``credentials_path``.
-        token_data: In-memory user token dict (production: GCAL_TOKEN_JSON).
-            When provided, takes precedence over ``token_path``.
+    In Cloud Run: returns the runtime SA's credentials from the metadata
+    server (no key file, no expiry concerns).
 
-    The interactive flow (``run_local_server``) is dev-only. In production we
-    always have token_data set, so we either return-as-valid or refresh-in-memory.
+    Locally: returns whatever ``gcloud auth application-default login`` set
+    up. The user account must have edit rights on each target calendar.
+
+    Either way, the *principal* (SA email or user email) must be granted
+    "Make changes to events" on every calendar in employees.toml.
     """
-    creds: Credentials | None = None
-    if token_data is not None:
-        creds = Credentials.from_authorized_user_info(token_data, SCOPES)
-    elif token_path.exists():
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-
-    if creds and creds.valid:
-        return creds
-
-    if creds and creds.expired and creds.refresh_token:
-        logger.info("refreshing expired GCal token")
-        creds.refresh(Request())
-        _write_token(token_path, creds)
-        return creds
-
-    # No usable token -- run interactive OAuth (dev only; will deadlock in Cloud Run).
-    if credentials_data is None and not credentials_path.exists():
-        raise FileNotFoundError(
-            f"OAuth client secrets not found at {credentials_path} -- "
-            "download from GCP Console (Desktop app OAuth client)"
-        )
-    logger.info("running interactive OAuth flow (browser will open)")
-    if credentials_data is not None:
-        flow = InstalledAppFlow.from_client_config(credentials_data, SCOPES)
-    else:
-        flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
-    creds = flow.run_local_server(port=0)
-    _write_token(token_path, creds)
+    creds, _ = google.auth.default(scopes=SCOPES)
     return creds
 
 
@@ -147,12 +116,7 @@ def sync_all(
     Returns:
         One SyncReport per employee that has a calendar configured.
     """
-    creds = load_credentials(
-        cfg.gcal_credentials_path,
-        cfg.gcal_token_path,
-        credentials_data=cfg.gcal_credentials_data,
-        token_data=cfg.gcal_token_data,
-    )
+    creds = load_credentials()
     service = build_service(creds)
     tz = ZoneInfo(cfg.timezone)
     window_start, window_end = sync_window(scraped.keys(), tz)
@@ -284,23 +248,6 @@ def _delete_stale_events(
         if not page_token:
             break
     return deleted
-
-
-def _write_token(token_path: Path, creds: Credentials) -> None:
-    """Best-effort cache write.
-
-    In production the token may be mounted read-only from Secret Manager. We
-    don't strictly need to persist a refreshed token between runs (refresh
-    tokens are long-lived and don't typically rotate), so a write failure is
-    informational, not fatal.
-    """
-    try:
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(creds.to_json())
-    except OSError as exc:
-        # We log only the path + exception, never the credential contents,
-        # but semgrep flags any message containing the word "token".
-        logger.info("%s is not writable (%s) -- continuing in memory", token_path, exc)
 
 
 def _monday_of(d: date) -> date:

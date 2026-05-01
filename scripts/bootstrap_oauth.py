@@ -1,12 +1,12 @@
-"""One-time OAuth flow to generate .secrets/token.json.
+"""Verify ADC can write events on every calendar in employees.toml.
 
-Run this from your laptop (NOT in a container). It pops a browser tab,
-asks you to consent to the calendar.events scope, then writes the token
-to the path in your .env (default: .secrets/token.json).
+Replaces the older OAuth bootstrap flow now that we use Application Default
+Credentials throughout.
 
-After this, the daily sync uses the refresh_token in token.json and never
-needs interactive consent again -- as long as we run at least once every
-6 months to keep the refresh token alive.
+Locally: run after `gcloud auth application-default login` to confirm your
+user account has edit rights on each calendar.
+
+In Cloud Run: not needed (the runtime SA exercises this on every execution).
 
 Usage:
     .\\.venv\\Scripts\\python.exe scripts\\bootstrap_oauth.py
@@ -28,26 +28,18 @@ def main() -> int:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
     cfg = load_config()
-    print(f"\nCredentials path: {cfg.gcal_credentials_path}")
-    print(f"Token path:       {cfg.gcal_token_path}")
     print("Configured employees / calendars:")
     for emp in cfg.employees:
         print(f"  - {emp.name} -> {emp.calendar_id}")
     print()
 
-    creds = load_credentials(
-        cfg.gcal_credentials_path,
-        cfg.gcal_token_path,
-        credentials_data=cfg.gcal_credentials_data,
-        token_data=cfg.gcal_token_data,
-    )
+    creds = load_credentials()
     service = build_service(creds)
 
-    # Verify by calling events().list -- this works under calendar.events scope.
-    # calendars().get() needs broader scope (calendar.readonly) which we don't request.
     now = datetime.now(UTC)
     horizon = now + timedelta(days=14)
-    print("OAuth OK. Verifying event access on each calendar...\n")
+    print("Verifying event access on each calendar...\n")
+    failures = 0
     for emp in cfg.employees:
         try:
             resp = (
@@ -63,10 +55,17 @@ def main() -> int:
             )
             count = len(resp.get("items", []))
             print(f"  [OK] {emp.name}: events().list returned {count} event(s) in next 14 days")
-        except Exception as exc:
+        except Exception as exc:  # diagnostic only
+            failures += 1
             print(f"  [FAIL] {emp.name}: {type(exc).__name__}: {exc}")
 
-    print(f"\nToken written to: {cfg.gcal_token_path}")
+    if failures:
+        print(
+            f"\n{failures} calendar(s) inaccessible. Share the calendar with the "
+            "principal you're authenticated as ('Make changes to events')."
+        )
+        return 1
+    print("\nAll calendars accessible.")
     return 0
 
 
