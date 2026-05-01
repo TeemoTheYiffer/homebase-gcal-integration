@@ -75,7 +75,8 @@ def test_shift_fields_match_fixture(sample_row_html: str) -> None:
 def test_gcal_event_id_format(sample_row_html: str) -> None:
     shifts = parse_week_html(sample_row_html, WEEK_START, [EMPLOYEE], LA)[EMPLOYEE]
     for s in shifts:
-        assert s.gcal_event_id == f"homebase{s.shift_id}"
+        expected = f"homebase{s.shift_id}d{s.shift_date.strftime('%Y%m%d')}"
+        assert s.gcal_event_id == expected
         assert s.gcal_event_id.isalnum() and s.gcal_event_id.islower()
 
 

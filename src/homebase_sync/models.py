@@ -25,9 +25,14 @@ class Shift:
 
     @property
     def gcal_event_id(self) -> str:
-        """Stable Google Calendar event ID derived from the Homebase shift ID.
+        """Stable Google Calendar event ID derived from shift ID + date.
 
-        GCal event IDs must match ``[a-v0-9]{5,1024}``; ``homebase`` + the
-        numeric shift ID always satisfies that constraint.
+        GCal event IDs must match ``[a-v0-9]{5,1024}``. Lowercase ``homebase`` +
+        numeric shift ID + ``d`` separator + ``YYYYMMDD`` always satisfies that.
+
+        Including the date in the ID has two benefits:
+          1. Rescheduled shifts get a fresh ID (delete-diff handles the swap).
+          2. Avoids ID collision with previously-cancelled events whose IDs
+             stay reserved by Google for hours after deletion.
         """
-        return f"homebase{self.shift_id}"
+        return f"homebase{self.shift_id}d{self.shift_date.strftime('%Y%m%d')}"
