@@ -32,12 +32,13 @@ def shift() -> Shift:
 
 def test_event_body_uses_deterministic_id(shift: Shift) -> None:
     body = build_event_body(shift, EMPLOYEE, "America/Los_Angeles")
-    assert body["id"] == "homebase2192445344"
+    assert body["id"] == "homebase2192445344d20260417"
 
 
 def test_event_body_summary_and_description(shift: Shift) -> None:
+    # 14:00 -> 20:00 = 6 hours
     body = build_event_body(shift, EMPLOYEE, "America/Los_Angeles")
-    assert body["summary"] == "Emilio Work: Prep/Fryer"
+    assert body["summary"] == "[6 Hour] Emilio Work: Prep/Fryer"
     assert "2192445344" in body["description"]
     assert EMPLOYEE in body["description"]
 
@@ -45,6 +46,7 @@ def test_event_body_summary_and_description(shift: Shift) -> None:
 def test_event_body_summary_uses_first_token_of_name() -> None:
     from datetime import date, datetime
 
+    # 14:00 -> 20:00 = 6 hours
     s = Shift(
         shift_id="1",
         shift_date=date(2026, 4, 17),
@@ -53,7 +55,37 @@ def test_event_body_summary_uses_first_token_of_name() -> None:
         role="Prep/Fryer",
     )
     body = build_event_body(s, "Josiah Cyphers", "America/Los_Angeles")
-    assert body["summary"] == "Josiah Work: Prep/Fryer"
+    assert body["summary"] == "[6 Hour] Josiah Work: Prep/Fryer"
+
+
+def test_event_body_summary_handles_half_hour_shifts() -> None:
+    from datetime import date, datetime
+
+    # 11:30 -> 18:00 = 6.5 hours
+    s = Shift(
+        shift_id="2",
+        shift_date=date(2026, 4, 17),
+        start=datetime(2026, 4, 17, 11, 30, tzinfo=LA),
+        end=datetime(2026, 4, 17, 18, 0, tzinfo=LA),
+        role="Line Cook",
+    )
+    body = build_event_body(s, "Alice Smith", "America/Los_Angeles")
+    assert body["summary"] == "[6.5 Hour] Alice Work: Line Cook"
+
+
+def test_event_body_summary_handles_overnight_shifts() -> None:
+    from datetime import date, datetime
+
+    # 21:00 -> next-day 01:00 = 4 hours
+    s = Shift(
+        shift_id="3",
+        shift_date=date(2026, 4, 17),
+        start=datetime(2026, 4, 17, 21, 0, tzinfo=LA),
+        end=datetime(2026, 4, 18, 1, 0, tzinfo=LA),
+        role="Closer",
+    )
+    body = build_event_body(s, "Sam Jones", "America/Los_Angeles")
+    assert body["summary"] == "[4 Hour] Sam Work: Closer"
 
 
 def test_event_body_times_are_iso_with_offset(shift: Shift) -> None:

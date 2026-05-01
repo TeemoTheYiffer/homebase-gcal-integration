@@ -78,9 +78,13 @@ def build_event_body(shift: Shift, employee_name: str, timezone: str) -> dict:
     returns 409, which we sidestep by using ``get`` -> ``update``/``insert``.
     """
     week_url = WEEK_URL_TEMPLATE.format(date=_monday_of(shift.shift_date).isoformat())
+    first_name = employee_name.split()[0]
+    hours = (shift.end - shift.start).total_seconds() / 3600
+    hours_str = str(int(hours)) if hours == int(hours) else f"{hours:.1f}"
+    summary = f"[{hours_str} Hour] {first_name} Work: {shift.role}"
     return {
         "id": shift.gcal_event_id,
-        "summary": f"{employee_name.split()[0]} Work: {shift.role}",
+        "summary": summary,
         "description": (
             f"Homebase shift ID: {shift.shift_id}\n"
             f"Employee: {employee_name}\n"
