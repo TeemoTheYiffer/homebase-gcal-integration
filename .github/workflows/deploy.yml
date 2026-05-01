@@ -80,3 +80,12 @@ jobs:
       - name: Cleanup secrets file
         if: always()
         run: rm -f env.yaml
+
+      - name: Smoke execute the Job
+        # Runs the freshly-deployed image synchronously so any container/runtime
+        # failure surfaces in the workflow (not at next cron). --wait blocks
+        # until the execution finishes; nonzero exit fails this step.
+        run: |
+          gcloud run jobs execute "${{ env.JOB_NAME }}" \
+            --region="${{ env.REGION }}" \
+            --wait
