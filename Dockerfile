@@ -1,8 +1,8 @@
 # Microsoft's Playwright base image ships Chromium + all OS deps preinstalled.
-# Tag matches the playwright Python package version we use locally (1.58.0).
-# 'noble' = Ubuntu 24.04 with Python 3.12; 'jammy' (22.04) is stuck at 3.10
-# and our pyproject requires >=3.11 (for stdlib tomllib).
-FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
+# IMPORTANT: this tag MUST match the pinned playwright version in pyproject.toml.
+# Mismatch -> "Executable doesn't exist at /ms-playwright/..." at runtime.
+# 'noble' = Ubuntu 24.04 with Python 3.12; 'jammy' (22.04) is stuck at 3.10.
+FROM mcr.microsoft.com/playwright/python:v1.59.0-noble
 
 WORKDIR /app
 
