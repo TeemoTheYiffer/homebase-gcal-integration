@@ -47,9 +47,9 @@ Render with `d2 architecture.d2 architecture.png` (CLI: `brew install d2`) or pa
 
 - Python 3.11 or later (pyenv: `pyenv install 3.13.1 && pyenv local 3.13.1`)
 - Google Cloud project with Calendar API enabled
-- OAuth Desktop client downloaded as `.secrets/credentials.json`
+- `gcloud auth application-default login` completed (local auth)
 - Homebase employee account
-- Calendar IDs you have edit access to
+- Each target calendar shared with your Google account (or with the Cloud Run runtime SA in production), permission "Make changes to events"
 
 ### Setup
 
@@ -70,13 +70,15 @@ Edit `employees.toml` with your `name = "..."` (must exactly match the Homebase 
 .venv/Scripts/python.exe -m black --check .
 ```
 
-### One-time OAuth
+### Verify calendar access
 
-Pops a browser, you consent, writes `.secrets/token.json`:
+Confirms ADC can list events on every calendar in `employees.toml`:
 
 ```bash
 .venv/Scripts/python.exe scripts/bootstrap_oauth.py
 ```
+
+If it reports `[FAIL]` for any calendar, share that calendar with the principal you're authenticated as.
 
 ### Smoke test (scrape only, no GCal writes)
 
@@ -102,7 +104,7 @@ GCP infra is managed in [`infra/`](infra/) (Terraform). CI/CD lives in [`.github
 - `tf-plan.yml`: posts `terraform plan` as a PR comment when `infra/**` changes
 - `deploy.yml`: builds the container, runs `terraform apply`, sets env vars on the Cloud Run Job from GH Secrets
 
-Required GitHub Secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA`, `HOMEBASE_EMAIL`, `HOMEBASE_PASSWORD`, `GCAL_CREDENTIALS_JSON`, `GCAL_TOKEN_JSON`, `EMPLOYEES_CONFIG_TOML`.
+Required GitHub Secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOYER_SA`, `HOMEBASE_EMAIL`, `HOMEBASE_PASSWORD`, `EMPLOYEES_CONFIG_TOML`. (No GCal credentials needed; the Cloud Run runtime SA authenticates via ADC.)
 
 ## Project layout
 

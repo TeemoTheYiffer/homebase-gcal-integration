@@ -1,17 +1,11 @@
 """Runtime configuration loading for homebase-sync.
 
-Two parallel sources for sensitive values:
-  * file paths -- the local-dev story (.env points at .secrets/*)
-  * inline content env vars -- the production story (Cloud Run injects
-    GCAL_CREDENTIALS_JSON / GCAL_TOKEN_JSON / EMPLOYEES_CONFIG_TOML directly)
-
-Inline content always wins when both are set, so the same code runs in both
-environments without conditionals at the call site.
+Auth uses Application Default Credentials (no key file or token to manage).
+Only Homebase scrape credentials and the employee->calendar map are config.
 """
 
 from __future__ import annotations
 
-import json
 import os
 import tomllib
 from dataclasses import dataclass
@@ -31,14 +25,8 @@ class AppConfig:
     homebase_email: str
     homebase_password: str
     employees: tuple[EmployeeConfig, ...]
-    gcal_credentials_path: Path
-    gcal_token_path: Path
     timezone: str
     log_level: str
-    # Inline secret content; populated from env vars when set. Takes precedence
-    # over the *_path fields downstream when not None.
-    gcal_credentials_data: dict | None = None
-    gcal_token_data: dict | None = None
 
     @property
     def employee_names(self) -> tuple[str, ...]:
@@ -62,13 +50,8 @@ def load_config() -> AppConfig:
     email = _required_env("HOMEBASE_EMAIL")
     password = _required_env("HOMEBASE_PASSWORD")
     employees_path = Path(os.environ.get("EMPLOYEES_CONFIG_PATH", "employees.toml"))
-    creds_path = Path(os.environ.get("GCAL_CREDENTIALS_PATH", ".secrets/credentials.json"))
-    token_path = Path(os.environ.get("GCAL_TOKEN_PATH", ".secrets/token.json"))
     tz = os.environ.get("SYNC_TIMEZONE", "America/Los_Angeles")
     log_level = os.environ.get("LOG_LEVEL", "INFO")
-
-    creds_data = _parse_json_env("GCAL_CREDENTIALS_JSON")
-    token_data = _parse_json_env("GCAL_TOKEN_JSON")
 
     employees_inline = os.environ.get("EMPLOYEES_CONFIG_TOML")
     if employees_inline:
@@ -84,12 +67,8 @@ def load_config() -> AppConfig:
         homebase_email=email,
         homebase_password=password,
         employees=employees,
-        gcal_credentials_path=creds_path,
-        gcal_token_path=token_path,
         timezone=tz,
         log_level=log_level,
-        gcal_credentials_data=creds_data,
-        gcal_token_data=token_data,
     )
 
 
@@ -98,19 +77,6 @@ def _required_env(key: str) -> str:
     if not value:
         raise ConfigError(f"required env var not set: {key}")
     return value
-
-
-def _parse_json_env(key: str) -> dict | None:
-    raw = os.environ.get(key)
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ConfigError(f"{key} is not valid JSON: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise ConfigError(f"{key} must be a JSON object, got {type(parsed).__name__}")
-    return parsed
 
 
 def _load_employees(path: Path) -> tuple[EmployeeConfig, ...]:

@@ -56,8 +56,6 @@ jobs:
         env:
           HOMEBASE_EMAIL:        ${{ secrets.HOMEBASE_EMAIL }}
           HOMEBASE_PASSWORD:     ${{ secrets.HOMEBASE_PASSWORD }}
-          GCAL_CREDENTIALS_JSON: ${{ secrets.GCAL_CREDENTIALS_JSON }}
-          GCAL_TOKEN_JSON:       ${{ secrets.GCAL_TOKEN_JSON }}
           EMPLOYEES_CONFIG_TOML: ${{ secrets.EMPLOYEES_CONFIG_TOML }}
         run: |
           python3 - <<'PY' > env.yaml
@@ -65,8 +63,6 @@ jobs:
           data = {
               "HOMEBASE_EMAIL":        os.environ["HOMEBASE_EMAIL"],
               "HOMEBASE_PASSWORD":     os.environ["HOMEBASE_PASSWORD"],
-              "GCAL_CREDENTIALS_JSON": os.environ["GCAL_CREDENTIALS_JSON"],
-              "GCAL_TOKEN_JSON":       os.environ["GCAL_TOKEN_JSON"],
               "EMPLOYEES_CONFIG_TOML": os.environ["EMPLOYEES_CONFIG_TOML"],
               "SYNC_TIMEZONE": "America/Los_Angeles",
               "LOG_LEVEL": "INFO",
