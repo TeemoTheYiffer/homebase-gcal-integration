@@ -199,7 +199,7 @@ def _upsert_shift(
     employee_name: str,
     timezone: str,
 ) -> str:
-    """Returns ``"created"``, ``"updated"``, or ``"recreated"``."""
+    """Returns ``"created"``, ``"updated"``, ``"recreated"``, or ``"skipped"``."""
     body = build_event_body(shift, employee_name, timezone)
     try:
         service.events().get(calendarId=calendar_id, eventId=shift.gcal_event_id).execute()
@@ -221,8 +221,32 @@ def _upsert_shift(
         # events" perm allows delete regardless of creator.
         if exc.resp.status == 403 and "forbiddenForNonCreator" in str(exc):
             logger.info("event %s has different creator; recreating", shift.gcal_event_id)
-            service.events().delete(calendarId=calendar_id, eventId=shift.gcal_event_id).execute()
-            service.events().insert(calendarId=calendar_id, body=body).execute()
+            try:
+                service.events().delete(
+                    calendarId=calendar_id, eventId=shift.gcal_event_id
+                ).execute()
+            except HttpError as del_exc:
+                # 410 Gone: event is already soft-deleted (status=cancelled).
+                # That's the state we want; proceed to re-insert.
+                if del_exc.resp.status != 410:
+                    raise
+                logger.info(
+                    "event %s already cancelled; proceeding to insert",
+                    shift.gcal_event_id,
+                )
+            try:
+                service.events().insert(calendarId=calendar_id, body=body).execute()
+            except HttpError as ins_exc:
+                # 409 Conflict: ID still reserved by the cancelled event.
+                # Google purges cancelled events on its own schedule (usually
+                # within a day). Skip this shift; next run will retry.
+                if ins_exc.resp.status != 409:
+                    raise
+                logger.warning(
+                    "event %s ID still reserved by cancelled event; skipping until purged",
+                    shift.gcal_event_id,
+                )
+                return "skipped"
             return "recreated"
         raise
 
