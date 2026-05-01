@@ -215,11 +215,11 @@ def _upsert_shift(
         ).execute()
         return "updated"
     except HttpError as exc:
-        # Calendar API forbids updating events whose creator is a different
-        # principal (legacy events from before the SA migration). Delete and
-        # re-insert so the SA becomes the new creator. "Make changes to
-        # events" perm allows delete regardless of creator.
-        if exc.resp.status == 403 and "forbiddenForNonCreator" in str(exc):
+        # Any 403 on update -- forbiddenForNonCreator (legacy events from before
+        # SA migration) OR plain 'forbidden' (post-trash-purge transient state)
+        # OR similar permission edge cases. Try delete + re-insert so the SA
+        # owns the event going forward. If delete also fails 403, re-raise.
+        if exc.resp.status == 403:
             logger.info("event %s has different creator; recreating", shift.gcal_event_id)
             try:
                 service.events().delete(
