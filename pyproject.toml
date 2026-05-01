@@ -11,7 +11,8 @@ requires-python = ">=3.11"
 authors = [{ name = "Joe Aguirre" }]
 license = { text = "Proprietary" }
 dependencies = [
-    "playwright>=1.49",
+    # Pinned to match the FROM tag in Dockerfile. Bump both in lockstep when upgrading.
+    "playwright==1.59.0",
     "beautifulsoup4>=4.12",
     "lxml>=5.3",
     "google-api-python-client>=2.150",
