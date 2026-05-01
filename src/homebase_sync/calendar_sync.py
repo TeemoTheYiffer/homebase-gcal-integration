@@ -199,7 +199,7 @@ def _upsert_shift(
     employee_name: str,
     timezone: str,
 ) -> str:
-    """Returns ``"created"`` or ``"updated"``."""
+    """Returns ``"created"``, ``"updated"``, or ``"recreated"``."""
     body = build_event_body(shift, employee_name, timezone)
     try:
         service.events().get(calendarId=calendar_id, eventId=shift.gcal_event_id).execute()
@@ -208,10 +208,23 @@ def _upsert_shift(
             service.events().insert(calendarId=calendar_id, body=body).execute()
             return "created"
         raise
-    service.events().update(
-        calendarId=calendar_id, eventId=shift.gcal_event_id, body=body
-    ).execute()
-    return "updated"
+
+    try:
+        service.events().update(
+            calendarId=calendar_id, eventId=shift.gcal_event_id, body=body
+        ).execute()
+        return "updated"
+    except HttpError as exc:
+        # Calendar API forbids updating events whose creator is a different
+        # principal (legacy events from before the SA migration). Delete and
+        # re-insert so the SA becomes the new creator. "Make changes to
+        # events" perm allows delete regardless of creator.
+        if exc.resp.status == 403 and "forbiddenForNonCreator" in str(exc):
+            logger.info("event %s has different creator; recreating", shift.gcal_event_id)
+            service.events().delete(calendarId=calendar_id, eventId=shift.gcal_event_id).execute()
+            service.events().insert(calendarId=calendar_id, body=body).execute()
+            return "recreated"
+        raise
 
 
 def _delete_stale_events(
