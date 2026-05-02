@@ -115,4 +115,14 @@ def _fetch_week_html(page: Page, week_start: date) -> str:
         page.wait_for_selector(SHIFT_GRID_SELECTOR)
     except PlaywrightTimeoutError as exc:
         raise ScrapeError(f"schedule grid never rendered for week {week_start}") from exc
+    # The first EWVEmployeeRow appears early; remaining rows + their shift
+    # tiles render asynchronously. In headless prod (slower first-paint than
+    # headed local) we'd capture a partial grid and silently miss shifts.
+    # networkidle waits for the React fetches to settle.
+    try:
+        page.wait_for_load_state("networkidle", timeout=10_000)
+    except PlaywrightTimeoutError:
+        # Some Homebase pages never go fully idle (long-poll, analytics).
+        # If the grid is rendered, that's enough; we tolerate this timeout.
+        logger.info("networkidle timeout for week %s -- proceeding", week_start.isoformat())
     return page.content()
